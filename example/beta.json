@@ -1,0 +1,11 @@
+{
+    "apns_cert_path": "beta_cert.pem",
+    "apns_key_path": "beta_key.pem",
+    "apns_server": "gateway.sandbox.push.apple.com:2195",
+    "log_successes": true,
+    "pool_size": 2,
+    "redis_db": 0,
+    "redis_netaddress": "tcp:127.0.0.1:6379",
+    "redis_password": "",
+    "redis_queue_key": "beta_apns_queue"
+}

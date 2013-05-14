@@ -1,0 +1,11 @@
+{
+    "apns_cert_path": "certs_can_be_relative_to_this_settings_file.pem",
+    "apns_key_path": "/or/can/be/absolute/path/to/certs.pem",
+    "apns_server": "gateway.push.apple.com:2195",
+    "log_successes": false,
+    "pool_size": 5,
+    "redis_db": 0,
+    "redis_netaddress": "tcp:127.0.0.1:6379",
+    "redis_password": "",
+    "redis_queue_key": "prod_apns_queue"
+}
