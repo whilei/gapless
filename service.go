@@ -1,3 +1,4 @@
+// Package gocov1 is a code coverage analysis tool for Go.
 package gapless
 
 import (
@@ -5,7 +6,7 @@ import (
     "encoding/json"
     "errors"
     "fmt"
-    godis "github.com/simonz05/godis/redis"
+    godis "github.com/cojac/godis/redis"
     "log"
     "os"
     "path/filepath"
