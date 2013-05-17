@@ -122,22 +122,3 @@ func TestDictObjString(t *testing.T) {
         dictObj.String("z", "default", "bad")
     })
 }
-
-func TestDictObjArray(t *testing.T) {
-    tmp := make(map[string]interface{})
-
-    err := json.Unmarshal([]byte(`{"first":["one", "two", "three"], "second":["1", "2"]}`), &tmp)
-    if err != nil {
-        t.Errorf("Json unmarshal error: %q", err)
-    }
-
-    dictObj := NewSettingsObj()
-    dictObj.Set("a", tmp["first"])
-
-    assert.Equal(t, tmp["first"].([]interface{}), dictObj.Array("a"))
-    assert.Equal(t, tmp["second"].([]interface{}), dictObj.Array("b", tmp["second"].([]interface{})))
-
-    assert.Panic(t, "Array received too many args: [2]", func() {
-        dictObj.Array("z", nil, nil)
-    })
-}

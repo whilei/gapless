@@ -9,10 +9,11 @@ import json
 
 
 r = redis.Redis()
+your_token = "fcd9163c28e0a3cf038c176a598171c128aede02c1eb43bbc4114d8f7097d814"
 
 for x in range(1, 10):
     payload = {
-        "token": "fcd9163c28e0a3cf038c176a598171c128aede02c1eb43bbc4114d8f7097d814",
+        "token": your_token,
         "identifier": x,
         "expiry": 7200,
         "data": {

@@ -3,17 +3,17 @@ package gapless
 // Setup the connection pool.
 type connectionPoolWrapper struct {
     size int
-    conn chan *ApnsConn
+    conn chan *apnsConn
 }
 
-var ConnPool = &connectionPoolWrapper{}
+// Holds individual connections to Apple's push servers.
+var connPool = &connectionPoolWrapper{}
 
+// InitPool populates the connection pool with the correct number of connections.
 func (p *connectionPoolWrapper) InitPool(size int, server, cert, key string) error {
-
-    // Create a buffered channel allowing size senders
-    p.conn = make(chan *ApnsConn, size)
+    p.conn = make(chan *apnsConn, size)
     for x := 0; x < size; x++ {
-        conn, err := NewApnsClient(server, cert, key)
+        conn, err := newApnsClient(server, cert, key)
         if err != nil {
             return err
         }
@@ -25,14 +25,18 @@ func (p *connectionPoolWrapper) InitPool(size int, server, cert, key string) err
     return nil
 }
 
-func (p *connectionPoolWrapper) GetConn() *ApnsConn {
+// Grab a connection from the pool.
+// If the pool has no available connections, this will block until one becomes available.
+func (p *connectionPoolWrapper) GetConn() *apnsConn {
     return <-p.conn
 }
 
-func (p *connectionPoolWrapper) ReleaseConn(conn *ApnsConn) {
+// Returns the connection back into the pool for reuse.
+func (p *connectionPoolWrapper) ReleaseConn(conn *apnsConn) {
     p.conn <- conn
 }
 
+// Gracefully close all the connections.
 func (p *connectionPoolWrapper) ShutdownConns() {
     for x := 0; x < p.size; x++ {
         tmp := <-p.conn

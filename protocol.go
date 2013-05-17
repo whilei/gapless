@@ -1,5 +1,3 @@
-// This file originated here: https://github.com/Mistobaan/go-apns/blob/master/protocol.go
-
 package gapless
 
 import (
@@ -15,7 +13,9 @@ import (
     "time"
 )
 
-type ApnsConn struct {
+// Connection object which handles the reading/writing and opening/closing of a connection.
+// This file is a modified version from this repo: https://github.com/Mistobaan/go-apns/blob/master/protocol.go
+type apnsConn struct {
     tlsconn          *tls.Conn
     tls_cfg          tls.Config
     endpoint         string
@@ -26,7 +26,7 @@ type ApnsConn struct {
     connected        bool
 }
 
-func (client *ApnsConn) connect() (err error) {
+func (client *apnsConn) connect() (err error) {
     if client.connected {
         return nil
     }
@@ -52,17 +52,13 @@ func (client *ApnsConn) connect() (err error) {
     return err
 }
 
-// NewClient creates a new apns connection. endpoint and certificate are paths
-// to the X.509 files.
-func NewApnsClient(endpoint, certificate, key string) (*ApnsConn, error) {
-
-    // Load certificates and setup config.
+func newApnsClient(endpoint, certificate, key string) (*apnsConn, error) {
     cert, err := tls.LoadX509KeyPair(certificate, key)
     if err != nil {
         return nil, err
     }
 
-    apnsConn := &ApnsConn{
+    apnsConn := &apnsConn{
         tlsconn: nil,
         tls_cfg: tls.Config{
             InsecureSkipVerify: true,
@@ -77,7 +73,7 @@ func NewApnsClient(endpoint, certificate, key string) (*ApnsConn, error) {
     return apnsConn, nil
 }
 
-func (client *ApnsConn) shutdown() (err error) {
+func (client *apnsConn) shutdown() (err error) {
     err = nil
     if client.tlsconn != nil {
         err = client.tlsconn.Close()
@@ -86,7 +82,6 @@ func (client *ApnsConn) shutdown() (err error) {
     return
 }
 
-// Utility function.
 func bwrite(w io.Writer, values ...interface{}) (err error) {
     for _, v := range values {
         err := binary.Write(w, binary.BigEndian, v)
@@ -98,10 +93,7 @@ func bwrite(w io.Writer, values ...interface{}) (err error) {
 }
 
 func createCommandOnePacket(transactionId uint32, expiration time.Duration, token, payload []byte) ([]byte, error) {
-
     expirationTime := uint32(time.Now().In(time.UTC).Add(expiration).Unix())
-
-    // build the actual pdu
     buffer := bytes.NewBuffer([]byte{})
 
     err := bwrite(buffer, uint8(1),
@@ -134,11 +126,11 @@ var errText = map[uint8]string{
     255: "None (Unknown)",
 }
 
-// SendPayload message to the specified device.
+// SendPayload sends push to the device (via Apple of course).
 // The commands waits for a response for no more that client.ReadTimeout.
-// The method uses the same connection. If the connection is closed it tries to reopen it at the next
-// time.
-func (client *ApnsConn) SendPayload(token, payload []byte, expiration time.Duration, identity uint32) (err error) {
+// The method uses the same connection. If the connection is closed it tries
+// to reopen it at the next time.
+func (client *apnsConn) SendPayload(token, payload []byte, expiration time.Duration, identity uint32) (err error) {
     if len(payload) > client.MAX_PAYLOAD_SIZE {
         return errors.New(fmt.Sprintf("The payload exceeds maximum allowed. It was: %d", len(payload)))
     }

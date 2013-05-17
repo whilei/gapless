@@ -9,15 +9,18 @@ import (
     "syscall"
 )
 
+// DictObj is our core datastore for the settings.
 type DictObj struct {
     data     map[string]interface{}
     ConfFile string
 }
 
+// NewSettingsObj is just a convenience method for a new settings obj.
 func NewSettingsObj() *DictObj {
     return &DictObj{data: make(map[string]interface{})}
 }
 
+// LoadFromFile takes a file path and populates the setting obj.
 func (s *DictObj) LoadFromFile(filepath string) {
     f, err := os.Open(filepath)
     if err != nil {
@@ -39,10 +42,13 @@ func (s *DictObj) LoadFromFile(filepath string) {
     s.ConfFile = filepath
 }
 
+// Set manually sets a single key / value pair.
 func (s *DictObj) Set(key string, val interface{}) {
     s.data[key] = val
 }
 
+// SetFromEnv takes an environment variable name and sets that value to a
+// specified key.
 func (s *DictObj) SetFromEnv(key, envKey string, args ...interface{}) {
     envVal, ok := syscall.Getenv(envKey)
 
@@ -60,6 +66,7 @@ func (s *DictObj) SetFromEnv(key, envKey string, args ...interface{}) {
     }
 }
 
+// Bool returns a bool settings value.
 func (s *DictObj) Bool(key string, args ...bool) bool {
     def := false
 
@@ -79,6 +86,7 @@ func (s *DictObj) Bool(key string, args ...bool) bool {
     return x.(bool)
 }
 
+// Int returns an int settings value.
 func (s *DictObj) Int(key string, args ...int) int {
     var def int = -1
 
@@ -104,6 +112,7 @@ func (s *DictObj) Int(key string, args ...int) int {
     return x.(int)
 }
 
+// Float returns a float settings value.
 func (s *DictObj) Float(key string, args ...float64) float64 {
     var def float64 = -1
 
@@ -123,6 +132,7 @@ func (s *DictObj) Float(key string, args ...float64) float64 {
     return x.(float64)
 }
 
+// String returns a string settings value.
 func (s *DictObj) String(key string, args ...string) string {
     var def string
 
@@ -140,23 +150,4 @@ func (s *DictObj) String(key string, args ...string) string {
         return def
     }
     return result.(string)
-}
-
-func (s *DictObj) Array(key string, args ...[]interface{}) []interface{} {
-    def := []interface{}(nil)
-
-    switch len(args) {
-    case 0:
-        break
-    case 1:
-        def = args[0]
-    default:
-        panic(fmt.Sprintf("Array received too many args: [%d]", len(args)))
-    }
-
-    result, present := s.data[key]
-    if !present {
-        return def
-    }
-    return result.([]interface{})
 }

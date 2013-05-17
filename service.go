@@ -1,4 +1,4 @@
-// Package gocov1 is a code coverage analysis tool for Go.
+// Package gapless is a highly available Apple push notification service.
 package gapless
 
 import (
@@ -13,11 +13,13 @@ import (
     "time"
 )
 
+// Global settings which are loaded from a json file passed via cmd line.
 var Settings = NewSettingsObj()
+
 var stdout = log.New(os.Stdout, "[Gapless I] ", log.Ldate|log.Ltime)
 var stderr = log.New(os.Stderr, "[Gapless E] ", log.Ldate|log.Ltime|log.Lshortfile)
 
-type GapObj struct {
+type gapObj struct {
     token      []byte
     identifier uint32
     expiry     time.Duration
@@ -25,6 +27,7 @@ type GapObj struct {
 }
 
 // Main run function. This will listen to our redis connection indefinitely.
+// If redis were to crash, this application will panic and exit.
 func Run() {
     // Prep our certificate file paths.
     apnsCert := Settings.String("apns_cert_path")
@@ -37,13 +40,13 @@ func Run() {
     }
 
     // Initialize the pool of APNS connections.
-    err := ConnPool.InitPool(Settings.Int("pool_size", 2), Settings.String("apns_server"), apnsCert, apnsKey)
+    err := connPool.InitPool(Settings.Int("pool_size", 2), Settings.String("apns_server"), apnsCert, apnsKey)
     if err != nil {
         stderr.Fatalln("Connection pool failed to initialize:", err)
     }
 
     // Clean up our connection pool when exiting.
-    defer ConnPool.ShutdownConns()
+    defer connPool.ShutdownConns()
 
     // Init our redis connection.
     redis := godis.New(Settings.String("redis_netaddress"), Settings.Int("redis_db", 0), Settings.String("redis_password"))
@@ -61,6 +64,8 @@ func Run() {
         stderr.Fatalln("The 'redis_queue_key' must be defined in your settings.")
     }
 
+    logSuccesses := Settings.Bool("log_successes", false)
+
     // Energizer loop.
     for {
         // List to our redis list, one item at a time.
@@ -75,12 +80,12 @@ func Run() {
         // We grab a connection from the pool.
         // This call will block until a connection is available again.
         // If your still getting back logged, increase your pool size.
-        conn := ConnPool.GetConn()
+        conn := connPool.GetConn()
 
         // Process the string in a goroutine.
-        go func(v string, apns *ApnsConn) {
+        go func(v string, apns *apnsConn) {
             // Ensure to return the connection back to the pool when done here.
-            defer ConnPool.ReleaseConn(apns)
+            defer connPool.ReleaseConn(apns)
 
             jsonIn := make(map[string]interface{})
             err := json.Unmarshal([]byte(v), &jsonIn)
@@ -130,7 +135,7 @@ func Run() {
                 } else {
                     stdout.Printf("Final SendPayload Error (ID %d): %s | %s\n", gapOut.identifier, err, jsonIn)
                 }
-            } else if Settings.Bool("log_successes", false) {
+            } else if logSuccesses {
                 stdout.Printf("Sent: %s\n", gapOut.jData)
             }
 
@@ -138,8 +143,8 @@ func Run() {
     }
 }
 
-func parseApnsJson(in map[string]interface{}) (*GapObj, error) {
-    gap := new(GapObj)
+func parseApnsJson(in map[string]interface{}) (*gapObj, error) {
+    gap := new(gapObj)
     var err error
 
     // Token
