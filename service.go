@@ -42,7 +42,7 @@ func Run() {
     // Initialize the pool of APNS connections.
     err := connPool.InitPool(Settings.Int("pool_size", 2), Settings.String("apns_server"), apnsCert, apnsKey)
     if err != nil {
-        stderr.Fatalln("Connection pool failed to initialize:", err)
+        stderr.Fatalf("Connection pool failed to initialize: %s.", err)
     }
 
     // Clean up our connection pool when exiting.
@@ -52,7 +52,7 @@ func Run() {
     redis := godis.New(Settings.String("redis_netaddress"), Settings.Int("redis_db", 0), Settings.String("redis_password"))
     _, err = redis.Ping()
     if err != nil {
-        stderr.Fatalln("Redis failed to initialize:", err)
+        stderr.Fatalf("Redis failed to initialize: %s.", err)
     }
 
     // Again, clean up our connection when exiting.
@@ -61,7 +61,7 @@ func Run() {
     // The redis queue key to be used.
     queueKey := Settings.String("redis_queue_key", "")
     if queueKey == "" {
-        stderr.Fatalln("The 'redis_queue_key' must be defined in your settings.")
+        stderr.Fatalf("The 'redis_queue_key' must be defined in your settings.")
     }
 
     logSuccesses := Settings.Bool("log_successes", false)
@@ -71,7 +71,7 @@ func Run() {
         // List to our redis list, one item at a time.
         item, err := redis.Blpop([]string{queueKey}, 0)
         if err != nil {
-            stderr.Fatalln("Redis BLPOP failed:", err)
+            stderr.Fatalf("Redis BLPOP failed: %s.", err)
         }
 
         // Grab the string out.
@@ -83,22 +83,22 @@ func Run() {
         conn := connPool.GetConn()
 
         // Process the string in a goroutine.
-        go func(v string, apns *apnsConn) {
+        go func(input string, apns *apnsConn) {
             // Ensure to return the connection back to the pool when done here.
             defer connPool.ReleaseConn(apns)
 
             jsonIn := make(map[string]interface{})
-            err := json.Unmarshal([]byte(v), &jsonIn)
+            err := json.Unmarshal([]byte(input), &jsonIn)
             if err != nil {
                 // If an error occurs while reading the json, ignore this item and continue on.
-                stderr.Printf("Json unmarshal error (%s): %s", v, err)
+                stderr.Printf("Json unmarshal error (%s): %s.", input, err)
                 return
             }
 
             gapOut, err := parseApnsJson(jsonIn)
             if err != nil {
                 // If an error occurs while reading the json, ignore this item and continue on.
-                stderr.Printf("Parsing apns structure error (%q): %s", jsonIn, err)
+                stderr.Printf("Parsing apns structure error (%q): %s.", jsonIn, err)
                 return
             }
 
@@ -114,11 +114,11 @@ func Run() {
                     jsonIn["_gapless_RETRYING"] = 1
                     retryPayload, _ := json.Marshal(jsonIn)
 
-                    stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (1).\n", gapOut.identifier, err)
+                    stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (1).", gapOut.identifier, err)
 
                     _, err = redis.Lpush(queueKey, retryPayload)
                     if err != nil {
-                        stderr.Printf("Redis LPUSH failed (%v): %s", retryPayload, err)
+                        stderr.Printf("Redis LPUSH failed (%v): %s.", retryPayload, err)
                         return
                     }
                 } else if uint32(result.(float64)) < 3 {
@@ -126,17 +126,17 @@ func Run() {
                     jsonIn["_gapless_RETRYING"] = uint32(result.(float64)) + 1
                     retryPayload, _ := json.Marshal(jsonIn)
 
-                    stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (%d).\n", gapOut.identifier, err, jsonIn["_gapless_RETRYING"])
+                    stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (%d).", gapOut.identifier, err, jsonIn["_gapless_RETRYING"])
                     _, err = redis.Lpush(queueKey, retryPayload)
                     if err != nil {
-                        stderr.Printf("Redis LPUSH failed (%v): %s", retryPayload, err)
+                        stderr.Printf("Redis LPUSH failed (%v): %s.", retryPayload, err)
                         return
                     }
                 } else {
-                    stdout.Printf("Final SendPayload Error (ID %d): %s | %s\n", gapOut.identifier, err, jsonIn)
+                    stdout.Printf("Final SendPayload Error (ID %d): %s | %s.", gapOut.identifier, err, jsonIn)
                 }
             } else if logSuccesses {
-                stdout.Printf("Sent: %s\n", gapOut.jData)
+                stdout.Printf("Sent: %s.", input)
             }
 
         }(raw, conn)
@@ -150,7 +150,7 @@ func parseApnsJson(in map[string]interface{}) (*gapObj, error) {
     // Token
     result, present := in["token"]
     if !present {
-        return gap, errors.New(fmt.Sprintf("Json Data Error (%v): Token was missing.\n", in))
+        return gap, errors.New(fmt.Sprintf("Json Data Error (%v): Token was missing.", in))
     }
     gap.token, err = hex.DecodeString(result.(string))
     if err != nil {
@@ -174,7 +174,7 @@ func parseApnsJson(in map[string]interface{}) (*gapObj, error) {
     // Notification - Data
     result, present = in["data"]
     if !present {
-        return gap, errors.New(fmt.Sprintf("Missing data structure: %v", in))
+        return gap, errors.New(fmt.Sprintf("Missing data structure: %v.", in))
     }
     data := result.(map[string]interface{})
 
