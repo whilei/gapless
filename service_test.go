@@ -3,7 +3,7 @@ package gapless
 import (
     "encoding/hex"
     "encoding/json"
-    "github.com/bmizerany/assert"
+    "github.com/cojac/assert"
     "testing"
     "time"
 )

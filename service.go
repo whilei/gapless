@@ -6,8 +6,10 @@ import (
     "encoding/json"
     "errors"
     "fmt"
-    godis "github.com/cojac/godis/redis"
+    "github.com/gosexy/redis"
     "log"
+    // "net/http"
+    // _ "net/http/pprof"
     "os"
     "path/filepath"
     "time"
@@ -29,6 +31,10 @@ type gapObj struct {
 // Main run function. This will listen to our redis connection indefinitely.
 // If redis were to crash, this application will panic and exit.
 func Run() {
+    // go func() {
+    //     log.Println(http.ListenAndServe("localhost:8000", nil))
+    // }()
+
     // Prep our certificate file paths.
     apnsCert := Settings.String("apns_cert_path")
     if !filepath.IsAbs(apnsCert) {
@@ -49,14 +55,20 @@ func Run() {
     defer connPool.ShutdownConns()
 
     // Init our redis connection.
-    redis := godis.New(Settings.String("redis_netaddress"), Settings.Int("redis_db", 0), Settings.String("redis_password"))
-    _, err = redis.Ping()
+    client := redis.New()
+    err = client.ConnectNonBlock(Settings.String("redis_host", "127.0.0.1"), uint(Settings.Int("redis_port", 6379)))
     if err != nil {
         stderr.Fatalf("Redis failed to initialize: %s.", err)
     }
 
+    // Select our DB.
+    _, err = client.Select(int64(Settings.Int("redis_db", 0)))
+    if err != nil {
+        stderr.Fatalf("Redis failed to select DB: %s.", err)
+    }
+
     // Again, clean up our connection when exiting.
-    defer redis.Quit()
+    defer client.Quit()
 
     // The redis queue key to be used.
     queueKey := Settings.String("redis_queue_key", "")
@@ -69,13 +81,13 @@ func Run() {
     // Energizer loop.
     for {
         // List to our redis list, one item at a time.
-        item, err := redis.Blpop([]string{queueKey}, 0)
+        item, err := client.BLPop(0, "", queueKey)
         if err != nil {
-            stderr.Fatalf("Redis BLPOP failed: %s.", err)
+            stderr.Fatalf("Redis BLPop failed: %s. (%v)", err, item)
         }
 
         // Grab the string out.
-        raw := item.StringMap()[queueKey]
+        raw := item[1]
 
         // We grab a connection from the pool.
         // This call will block until a connection is available again.
@@ -116,9 +128,10 @@ func Run() {
 
                     stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (1).", gapOut.identifier, err)
 
-                    _, err = redis.Lpush(queueKey, retryPayload)
-                    if err != nil {
-                        stderr.Printf("Redis LPUSH failed (%v): %s.", retryPayload, err)
+                    //endErr := client.Command(nil, "LPUSH", queueKey, string(retryPayload))
+                    _, endErr := client.LPush(queueKey, string(retryPayload))
+                    if endErr != nil {
+                        stderr.Printf("Redis LPush failed (%v): %s.", retryPayload, endErr)
                         return
                     }
                 } else if uint32(result.(float64)) < 3 {
@@ -127,9 +140,9 @@ func Run() {
                     retryPayload, _ := json.Marshal(jsonIn)
 
                     stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (%d).", gapOut.identifier, err, jsonIn["_gapless_RETRYING"])
-                    _, err = redis.Lpush(queueKey, retryPayload)
-                    if err != nil {
-                        stderr.Printf("Redis LPUSH failed (%v): %s.", retryPayload, err)
+                    _, endErr := client.LPush(queueKey, string(retryPayload))
+                    if endErr != nil {
+                        stderr.Printf("Redis LPush failed (%v): %s.", retryPayload, endErr)
                         return
                     }
                 } else {
