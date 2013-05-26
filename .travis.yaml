@@ -1,0 +1,2 @@
+language: go
+script: go get github.com/cojac/assert && go get github.com/cojac/gapless && go test
