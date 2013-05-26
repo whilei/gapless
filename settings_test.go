@@ -2,7 +2,7 @@ package gapless
 
 import (
     "encoding/json"
-    "github.com/cojac/assert"
+    "github.com/bmizerany/assert"
     "testing"
 )
 
