@@ -1,2 +1,1 @@
 language: go
-script: go get github.com/bmizerany/assert && go get github.com/gosexy/redis && go get github.com/cojac/gapless && go test
