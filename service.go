@@ -54,21 +54,13 @@ func Run() {
     // Clean up our connection pool when exiting.
     defer connPool.ShutdownConns()
 
-    // Init our redis connection.
-    client := redis.New()
-    err = client.ConnectNonBlock(Settings.String("redis_host", "127.0.0.1"), uint(Settings.Int("redis_port", 6379)))
-    if err != nil {
-        stderr.Fatalf("Redis failed to initialize: %s.", err)
-    }
-
-    // Select our DB.
-    _, err = client.Select(int64(Settings.Int("redis_db", 0)))
-    if err != nil {
-        stderr.Fatalf("Redis failed to select DB: %s.", err)
-    }
+    // Init our redis connections.
+    inClient := newRedisConn()
+    outClient := newRedisConn()
 
     // Again, clean up our connection when exiting.
-    defer client.Quit()
+    defer inClient.Quit()
+    defer outClient.Quit()
 
     // The redis queue key to be used.
     queueKey := Settings.String("redis_queue_key", "")
@@ -81,7 +73,7 @@ func Run() {
     // Energizer loop.
     for {
         // List to our redis list, one item at a time.
-        item, err := client.BLPop(0, "", queueKey)
+        item, err := inClient.BLPop(0, "", queueKey)
         if err != nil {
             stderr.Fatalf("Redis BLPop failed: %s. (%v)", err, item)
         }
@@ -128,8 +120,7 @@ func Run() {
 
                     stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (1).", gapOut.identifier, err)
 
-                    //endErr := client.Command(nil, "LPUSH", queueKey, string(retryPayload))
-                    _, endErr := client.LPush(queueKey, string(retryPayload))
+                    _, endErr := outClient.LPush(queueKey, string(retryPayload))
                     if endErr != nil {
                         stderr.Printf("Redis LPush failed (%v): %s.", retryPayload, endErr)
                         return
@@ -140,13 +131,13 @@ func Run() {
                     retryPayload, _ := json.Marshal(jsonIn)
 
                     stdout.Printf("SendPayload Error (ID %d): %s. Retrying count (%d).", gapOut.identifier, err, jsonIn["_gapless_RETRYING"])
-                    _, endErr := client.LPush(queueKey, string(retryPayload))
+                    _, endErr := outClient.LPush(queueKey, string(retryPayload))
                     if endErr != nil {
                         stderr.Printf("Redis LPush failed (%v): %s.", retryPayload, endErr)
                         return
                     }
                 } else {
-                    stdout.Printf("Final SendPayload Error (ID %d): %s | %s.", gapOut.identifier, err, jsonIn)
+                    stdout.Printf("Final SendPayload Error (ID %d): %s | %v.", gapOut.identifier, err, input)
                 }
             } else if logSuccesses {
                 stdout.Printf("Sent: %s.", input)
@@ -154,6 +145,22 @@ func Run() {
 
         }(raw, conn)
     }
+}
+
+func newRedisConn() *redis.Client {
+    r := redis.New()
+    err := r.Connect(Settings.String("redis_host", "127.0.0.1"), uint(Settings.Int("redis_port", 6379)))
+    if err != nil {
+        stderr.Fatalf("Redis failed to initialize: %s.", err)
+    }
+
+    // Select our DB.
+    _, err = r.Select(int64(Settings.Int("redis_db", 0)))
+    if err != nil {
+        stderr.Fatalf("Redis failed to select DB: %s.", err)
+    }
+
+    return r
 }
 
 func parseApnsJson(in map[string]interface{}) (*gapObj, error) {

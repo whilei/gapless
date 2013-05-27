@@ -7,6 +7,10 @@ This package builds into a standalone application which in turns listens to a
 to push out. Gapless uses a pool to make multiple connections to Apples push
 notification servers. This allows for a wicked amount of throughput!
 
+Gapless will retry failed pushes. Internally the app adds a key to the json
+obj (`_gapless_RETRYING`) and will retry a total of three times. If the push
+has failed three times, we log it as an error and forget about it.
+
 ## How to install
 
 Install the app with `go get`. Be sure to add the second *gapless* in the path:
