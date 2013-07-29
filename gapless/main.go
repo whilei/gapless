@@ -17,6 +17,8 @@ func main() {
     // Tell gapless about our settings file.
     gapless.Settings.LoadFromFile(filepath.Clean(os.Args[1]))
 
+    go gapless.RunGcm()
+
     // Start the connections.
     gapless.Run()
 }
