@@ -66,7 +66,7 @@ func RunGcm() {
 
             // Create the message to be sent.
             regIds := []string{id.(string)}
-            msg := gcm.NewMessage(data.(map[string]string), regIds...)
+            msg := gcm.NewMessage(data.(map[string]interface{}), regIds...)
 
             // Create a Sender to send the message.
             sender := &gcm.Sender{apiKey, nil}
